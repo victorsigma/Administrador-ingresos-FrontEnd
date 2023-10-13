@@ -6,5 +6,7 @@ import { Component } from '@angular/core';
   styleUrls: ['./gastos.component.css']
 })
 export class GastosComponent {
-
+  constructor(){
+   
+  }
 }
