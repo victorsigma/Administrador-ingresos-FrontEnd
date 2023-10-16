@@ -1,85 +1,107 @@
-import { Component, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
-declare var pdfjsLib: any;
+import { Component, ElementRef, ViewChild, TemplateRef } from '@angular/core';
+import { IngresoService } from 'src/app/Servicios/ingreso.service';
+import { BsModalService, BsModalRef } from 'ngx-bootstrap/modal';
+import { FormBuilder, FormGroup, Validators  } from '@angular/forms';
 
 @Component({
   selector: 'app-ingresos',
   templateUrl: './ingresos.component.html',
   styleUrls: ['./ingresos.component.css']
 })
-export class IngresosComponent implements AfterViewInit {
-  @ViewChild('pdfFileInput') pdfFileInput: ElementRef | undefined;
-  @ViewChild('pdfText') pdfText: ElementRef | undefined;
+export class IngresosComponent{
+  @ViewChild('fileInput') fileInput: ElementRef | undefined;
+  selectedFile: File | undefined;
+  showSpinner = false;
+  bsModalRef: BsModalRef | undefined;
+  selectedFileName: string | undefined;
+  reporteMensual: any;
+  ocultarDatosMensuales = false;
+  ocultarDatosDiarios = true;
+  miFormulario: FormGroup;
 
-  ngAfterViewInit(): void {
-    if (this.pdfFileInput) {
-      this.pdfFileInput.nativeElement.addEventListener('change', (event: any) => {
-        const file = event.target.files[0];
+  constructor(private ingresoService:IngresoService,private modalService: BsModalService, private fb: FormBuilder) {
+    this.miFormulario = this.fb.group({
+      fechaInicio: [null, Validators.required],
+      fechaFin: [null, Validators.required],
+    }, { validators: this.dateRangeValidator });
+  }
 
-        if (file) {
-          const reader = new FileReader();
+  dateRangeValidator(group: FormGroup): { [key: string]: any } | null {
+    const fechaInicioControl = group.get('fechaInicio');
+    const fechaFinControl = group.get('fechaFin');
 
-          reader.onload = (loadEvent: any) => {
-            const result = loadEvent.target.result;
-            if (result instanceof ArrayBuffer) {
-              const typedarray = new Uint8Array(result);
-              pdfjsLib.getDocument({ data: typedarray }).promise.then((pdf: any) => {
-                let pdfText = '';
+    if (fechaInicioControl && fechaFinControl) {
+      const fechaInicio = fechaInicioControl.value;
+      const fechaFin = fechaFinControl.value;
 
-                for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-                  pdf.getPage(pageNumber).then((page: any) => {
-                    return page.getTextContent();
-                  }).then((textContent: any) => {
-                    for (let item of textContent.items) {
-                      pdfText += item.str + ' ';
-                    }
+      if (fechaInicio && fechaFin && fechaInicio > fechaFin) {
+        return { dateRangeInvalid: true };
+      }
+    }
 
-                    if (pageNumber === pdf.numPages) {
-                      if (this.pdfText) {
-                        this.pdfText.nativeElement.textContent = pdfText;
+    return null;
+  }
 
-                        const dateRegex = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/; 
-                        const subTotalRegex = /SUB-TOTAL:\s+([\d,]+\.\d{2})/;
-                        const referenciaRegex = /BBVA BANCOMER.*? (\d{20})/;
-                        const cfdiRegex = /FACTURA\s+([a-fA-F\d-]+)/;
-                        const m3Regex = /REAL ([\d,]+\.\d{2})/;
-
-                        const dateMatch = pdfText.match(dateRegex);
-                        const amountMatch = pdfText.match(subTotalRegex);
-                        const referneceMach = pdfText.match(referenciaRegex);
-                        const cfdiMatch = pdfText.match(cfdiRegex);
-                        const m3Match = pdfText.match(m3Regex);
-
-                        if ( amountMatch && referneceMach && dateMatch && m3Match && cfdiMatch) {
-                            const fecha = dateMatch[0];
-                            const recepcion = amountMatch[1];
-                            const referencia = referneceMach[1];
-                            const cfdi = cfdiMatch[1];
-                            const m3corregidos = m3Match[1];
-                            console.log(`CFDI : ${cfdi}`);
-                            console.log(`Referencia : ${referencia}`);
-                            console.log(`Fecha: ${fecha}`);
-                            console.log(`M3Corregidos: ${m3corregidos}`);
-                            console.log(`Sub-Total: ${recepcion}`);
-                        } else {
-                            console.log("No se encontró la información del cfdi");
-                        }
-                      }
-                    }
-                  });
-                }
-              });
-            } else {
-              console.error('No se pudo leer el archivo como ArrayBuffer.');
-            }
-          };
-
-          reader.readAsArrayBuffer(file);
-        }
-      });
+  onFileSelected(event: any) {
+    this.selectedFile = event.target.files[0];
+    // Actualizar el label del archivo seleccionado
+    if (this.selectedFile) {
+      this.selectedFileName = this.selectedFile.name;
+    } else {
+      this.selectedFileName = undefined; 
     }
   }
 
-}
+  onSubmit(event: Event,template2: TemplateRef<any>) {
+    event.preventDefault();
+    if (this.selectedFile) {
+      const formData = new FormData();
+      formData.append('archivoExcel', this.selectedFile);
+      setTimeout(() => {
+        this.showSpinner = false;
+        this.ingresoService.CargarReporteExel(formData).subscribe(
+          data => {
+            console.log('Archivo cargado con éxito', data);
+            this.reporteMensual=data
+            this.closeModal()
+            setTimeout(() => { 
+              this.openModal2(template2);
+            },500);
+          },
+          err=> {
+            this.closeModal();
+            console.error('Error al cargar el archivo', err);
+          }
+        );
+      }, 2000);
+    } else {
+      console.error('Debes seleccionar un archivo');
+    }
+  }
 
+  openModal1(template: TemplateRef<any>) {
+    this.bsModalRef = this.modalService.show(template,{
+      backdrop: 'static',
+      keyboard: false
+    });
+  }
+
+  openModal2(template2: TemplateRef<any>) {
+    this.bsModalRef = this.modalService.show(template2, {
+      backdrop: 'static',
+      keyboard: false
+    }); // Abre el segundo modal
+  }
   
+  closeModal() {
+    this.clearFileInput(); 
+    this.bsModalRef?.hide();
+  }
 
+
+  clearFileInput() {
+      this.selectedFile = undefined; // Limpia la variable selectedFile
+      this.selectedFileName = undefined; // Limpia el nombre del archivo seleccionado
+  }
+  
+}
