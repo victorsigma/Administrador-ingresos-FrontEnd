@@ -1,10 +1,10 @@
 <div>
-<ul class="nav nav-tabs justify-content-center">
+  <ul class="nav nav-tabs justify-content-center">
     <li class="nav-item">
-      <a  class="nav-link" href="/home">Administracion</a>
+      <a class="nav-link" href="/home">Administracion</a>
     </li>
     <li class="nav-item">
-      <a  class="nav-link active" aria-current="page" href="/ingresos" >Ingresos</a>
+      <a class="nav-link active" aria-current="page" href="/ingresos">Ingresos</a>
     </li>
     <li class="nav-item">
       <a class="nav-link" href="/gastos">Gastos</a>
@@ -15,26 +15,21 @@
 <div>
   <div id="container-grafica">
     <img src="https://docs.aws.amazon.com/es_es/quicksight/latest/user/images/example-visual-line-chart.png" alt="" id="grafica">
-
-    <button type="button" class="btn btn-secondary btn-lg" id="boton-ingresar-reporte" data-bs-toggle="modal" data-bs-target="#Modal1" >Ingresar Reporte</button>
+    <button type="button" class="btn btn-secondary btn-lg" id="boton-ingresar-reporte" (click)="openModal1(template1)">Ingresar Reporte</button>
   </div>
   <hr>
 </div>
 
-
-<!-- Modal -->
-<div class="modal fade" id="Modal1" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true" >
-  <div class="modal-dialog">
-    <div class="modal-content">
+<!-- Modal 1 -->
+<ng-template #template1  class="modal" tabindex="-1" role="dialog">
       <div class="modal-header">
-        <h1 class="modal-title fs-5" id="staticBackdropLabel">Ingresar Reporte Ingresos Mensual</h1>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h1 class="modal-title fs-5">Ingresar Reporte Ingresos Mensual</h1>
       </div>
       <div class="modal-body">
-        <form (ngSubmit)="onSubmit($event)">
+        <form (ngSubmit)="onSubmit($event,template2)">
           <div class="d-flex justify-content-center">
             <div class="input-group mb-3">
-              <label class="input-group-text" for="customFile">Seleccionar Archivo</label>
+              <label class="input-group-text" for="customFile">{{ selectedFileName ? selectedFileName : 'Seleccionar Archivo' }}</label>
               <input type="file" class="form-control" id="customFile" accept=".xlsx" #fileInput (change)="onFileSelected($event)" style="display: none;">
             </div>
             <div class="input-group mb-3">
@@ -42,8 +37,8 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-primary" (click)="onSubmit($event)">Cargar Reporte</button>
+            <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" (click)="showSpinner = true">Cargar Reporte</button>
           </div>
           <div class="text-center" *ngIf="showSpinner">
             <div class="spinner-border" role="status">
@@ -53,28 +48,102 @@
           </div>
         </form>
       </div>
+</ng-template>
+
+<!-- Modal 2 -->
+<ng-template #template2 class="modal" tabindex="-1" role="dialog">
+  <div class="modal-header">
+    <h1 class="modal-title fs-5">Ingresos</h1>
+  </div>
+  <div class="modal-body">
+    <!-- Tabla de Datos Mensuales -->
+    <h2>Datos Mensuales</h2>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" [(ngModel)]="ocultarDatosMensuales">
+      <label class="form-check-label">Ocultar Datos Mensuales</label>
+    </div>
+    <table class="table" *ngIf="!ocultarDatosMensuales">
+      <thead>
+        <tr>
+          <th>Concepto</th>
+          <th>Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Inscripciones</td>
+          <td>{{ reporteMensual.DatosMensuales.Inscripciones_total_mes }}</td>
+        </tr>
+        <tr>
+          <td>Otros</td>
+          <td>{{ reporteMensual.DatosMensuales.Otros_total_mes }}</td>
+        </tr>
+        <tr>
+          <td>Subvenciones</td>
+          <td>{{ reporteMensual.DatosMensuales.Subvenciones_total_mes }}</td>
+        </tr>
+        <tr>
+          <td>Auxiliares</td>
+          <td>{{ reporteMensual.DatosMensuales.auxiliares_total_mes }}</td>
+        </tr>
+        <tr>
+          <td>Titulos</td>
+          <td>{{ reporteMensual.DatosMensuales.titulos_total_mes}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Tabla de Datos Diarios -->
+    <h2>Datos Diarios</h2>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" [(ngModel)]="ocultarDatosDiarios">
+      <label class="form-check-label">Ocultar Datos Diarios</label>
+    </div>
+    <table class="table" *ngIf="!ocultarDatosDiarios">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Utiliza un *ngFor para iterar sobre los datos diarios -->
+        <tr *ngFor="let datoDiario of reporteMensual.Diario.datosDelRangoDias; let i = index">
+          <td>{{ datoDiario[0] }}</td> <!-- El primer elemento del arreglo es la fecha -->
+          <td>{{ reporteMensual.Diario.datosDelRangoTotalDia[i][0] }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary"  (click)="closeModal()">Cancelar</button>
+    <button type="submit" class="btn btn-primary">Cargar Información</button>
+  </div>
+</ng-template>
+
+<form [formGroup]="miFormulario">
+<div class="container-fluid text-center">
+  <div class="row justify-content-center">
+    <div class="col-3">
+      <input type="date" class="form-control" id="rangoFecha1" formControlName="fechaInicio">
+      <label for="fechaInicio">Fecha Inicio</label>
+    </div>
+    <div class="col-3">
+      <input type="date" class="form-control" id="rangoFecha2" formControlName="fechaFin">
+      <label for="fechaFin">Fecha Fin</label>
+    </div>
+    <div class="col-3">
+      <button type="button" class="btn btn-secondary btn-lg btn-block" id="boton-filtrar" [disabled]="miFormulario.invalid">Filtrar Registros</button>
+      <div *ngIf="miFormulario.hasError('dateRangeInvalid')">
+        El rango de fechas no es válido.
+      </div>
     </div>
   </div>
 </div>
+</form>
 
 
-<!-- Modal -->
-<div class="modal fade" id="Modal2" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true" *ngIf="showSecondModal">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h1 class="modal-title fs-5" id="staticBackdropLabel">Modal dos</h1>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-primary" >Cargar Informacion</button>
-          </div>
-      </div>
-    </div>
-  </div>
-</div>
+
+
 
 
