@@ -1,14 +1,14 @@
-import { Component, ElementRef, ViewChild, TemplateRef } from '@angular/core';
+import { Component, ElementRef, ViewChild, TemplateRef, OnInit } from '@angular/core';
 import { IngresoService } from 'src/app/Servicios/ingreso.service';
 import { BsModalService, BsModalRef } from 'ngx-bootstrap/modal';
 import { FormBuilder, FormGroup, Validators  } from '@angular/forms';
-
+import { io,Socket } from 'socket.io-client';
 @Component({
   selector: 'app-ingresos',
   templateUrl: './ingresos.component.html',
   styleUrls: ['./ingresos.component.css']
 })
-export class IngresosComponent{
+export class IngresosComponent implements OnInit{
   @ViewChild('fileInput') fileInput: ElementRef | undefined;
   selectedFile: File | undefined;
   showSpinner = false;
@@ -18,12 +18,21 @@ export class IngresosComponent{
   ocultarDatosMensuales = false;
   ocultarDatosDiarios = true;
   miFormulario: FormGroup;
+  private socket: Socket;
 
   constructor(private ingresoService:IngresoService,private modalService: BsModalService, private fb: FormBuilder) {
     this.miFormulario = this.fb.group({
       fechaInicio: [null, Validators.required],
       fechaFin: [null, Validators.required],
     }, { validators: this.dateRangeValidator });
+    this.socket = io('http://localhost:2000');
+  }
+
+  ngOnInit() {
+    // Escucha el evento 'excel-procesado' para recibir mensajes globales
+    this.socket.on('excel-procesado', (mensagge: any) => {
+        window.alert(mensagge);
+    });
   }
 
   dateRangeValidator(group: FormGroup): { [key: string]: any } | null {
@@ -61,8 +70,15 @@ export class IngresosComponent{
         this.showSpinner = false;
         this.ingresoService.CargarReporteExel(formData).subscribe(
           data => {
-            console.log('Archivo cargado con éxito', data);
-            this.reporteMensual=data
+            console.log('Archivo cargado con éxito', data.data);
+            if (this.isSocketAvailable()) {
+              // El servicio Socket.io está disponible, envía el mensaje global
+              this.socket.emit('excel-procesado', data.message);
+            } else {
+              // El servicio Socket.io no está disponible, maneja el mensaje local
+              window.alert(data.message);
+            }
+            this.reporteMensual=data.data
             this.closeModal()
             setTimeout(() => { 
               this.openModal2(template2);
@@ -102,6 +118,10 @@ export class IngresosComponent{
   clearFileInput() {
       this.selectedFile = undefined; // Limpia la variable selectedFile
       this.selectedFileName = undefined; // Limpia el nombre del archivo seleccionado
+  }
+
+  private isSocketAvailable(): boolean {
+    return this.socket.connected;
   }
   
 }
